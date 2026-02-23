@@ -31,6 +31,10 @@ install(DIRECTORY launch config robot_model
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(DIRECTORY scripts/util
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 install(PROGRAMS
   scripts/joy_joint_state_node.py
   DESTINATION lib/${PROJECT_NAME}
@@ -48,6 +52,11 @@ install(FILES
 
 install(FILES
   scripts/test_rsu_solver.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(FILES
+  scripts/tf_rsu_param_validator.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

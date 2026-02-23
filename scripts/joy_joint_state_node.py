@@ -54,12 +54,13 @@ class JoyJointStateNode(Node):
 
 		self.roll_limit  = float(self.declare_parameter("roll_limit_rad",  math.radians(30.0)).value)
 		self.pitch_limit = float(self.declare_parameter("pitch_limit_rad", math.radians(30.0)).value)
+		self.prev_alpha_solver = np.array([0.0, 0.0], dtype=np.float64)
 
 
 		a_W_flat = self.declare_parameter(
 			"a_W_mm_flat",
 			[0.0,  36.0, 170.0,
-			0.0, -36.0,  82.1]
+			0.0, -36.0,  82.0]
 		).value
 
 		b_F_flat = self.declare_parameter(
@@ -68,13 +69,25 @@ class JoyJointStateNode(Node):
 			-30.0, -36.0, 0.0]
 		).value
 
-		c_list = self.declare_parameter("c_mm", [30.0, 30.0]).value
-		r_list = self.declare_parameter("r_mm", [170.0, 82.1]).value
+		c_list = self.declare_parameter("c_mm", [30.0, -30.0]).value
+		r_list = self.declare_parameter("r_mm", [170.0, 82.0]).value
+		
 
 		psi_list = self.declare_parameter(
 			"psi_rad",
-			[deg2rad(-90.0), deg2rad(90.0)]
+			[deg2rad(90.0), deg2rad(-90.0)]
 		).value
+
+		# print all params for sanity check
+		self.get_logger().info(
+			f"RSU Params:\n"
+			f"  a_W_mm_flat: {a_W_flat}\n"
+			f"  b_F_mm_flat: {b_F_flat}\n"
+			f"  c_mm: {c_list}\n"
+			f"  r_mm: {r_list}\n"
+			f"  psi_rad: {psi_list}"
+		)
+
 
 		# 타입/길이 검증(터지면 원인 바로 보이게)
 		if len(a_W_flat) != 6:
@@ -100,13 +113,23 @@ class JoyJointStateNode(Node):
 
 		# ===== init solver =====
 		# 회전 방향 반대 처리
+		# p = RSUParams(
+		# 	a_W=self.a_W,
+		# 	b_F=self.b_F,
+		# 	c=self.c,
+		# 	r=self.r,
+		# 	psi=self.psi,
+		# )
+
 		p = RSUParams(
-			a_W=self.a_W,
-			b_F=self.b_F,
-			c=self.c,
-			r=self.r,
-			psi=self.psi,
-		)
+    a_W=np.array([[0,  36, 169.5],
+                  [0, -36,  81]]),
+    b_F=np.array([[-30,  36, 0],
+                  [-30, -36, 0]]),
+    c=np.array([30, -30]),
+    r=np.array([169.5, 81.0]),
+    psi=np.array([deg2rad(90), deg2rad(-90)]),
+)
 		self.solver = RSUSolver(p)
 
 		# ===== Gamepad =====
@@ -194,9 +217,8 @@ class JoyJointStateNode(Node):
 
 		cmd = self.gamepad.get_command()  # [vx, vy, wz]
 		vx = float(cmd[0])  # pitch
-		# vy = float(cmd[1])  # roll
-		vy = 0.0
-		# wz는 여기서는 무시 (요구사항: 발목 roll/pitch만 조이스틱으로)
+		vy = float(cmd[1])  # roll
+		# vy = 0.0
 
 		mag = max(abs(vx), abs(vy))
 		if (not self.received_first_input) and mag > self.input_deadzone:
@@ -222,19 +244,19 @@ class JoyJointStateNode(Node):
 
 		# RSU solve -> alpha
 		# TODO ROLL / PITCH 
-		res = self.solver.solve(-1.0 * self.roll, -1.0 * self.pitch, self.prev_alpha)
+		res = self.solver.solve(self.roll, self.pitch, self.prev_alpha_solver)
 
 		if bool(res.feasible):
-			a = np.array(res.alpha, dtype=np.float64).reshape(2,)
-			self.alpha1 = float(a[0])
-			self.alpha2 = float(a[1])
-			self.prev_alpha[:] = a
+			a_solver = np.array(res.alpha, dtype=np.float64).reshape(2,)
+			self.alpha1 =  float(a_solver[0])   # 1번 축 반대라면
+			self.alpha2 =  float(a_solver[1])
+			self.prev_alpha_solver[:] = a_solver
 		else:
 			# infeasible이면: alpha 유지(또는 0으로)
 			if not self.hold_alpha_on_infeasible:
 				self.alpha1 = 0.0
 				self.alpha2 = 0.0
-				self.prev_alpha[:] = [0.0, 0.0]
+				self.prev_alpha_solver[:] = [0.0, 0.0]
 
 			self.get_logger().warn(
 				f"RSU infeasible for roll={self.roll:+.3f}, pitch={self.pitch:+.3f}. Holding alpha.",
