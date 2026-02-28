@@ -1,12 +1,5 @@
 """
-
-테스트 결과 정리
-
-오 성공했음 나이스 ~ 
-
-
-sourcing 
-
+RSU 파라메터 테이블 버전 > prototype 버전으로 업데이트 완료
 """
 
 
@@ -19,12 +12,12 @@ from util.rsu_solver import RSUParams, RSUSolver
 def deg2rad(d): return d * math.pi / 180.0
 
 p = RSUParams(
-    a_W=np.array([[0,  36, 169.5],
-                  [0, -36,  81]]),
-    b_F=np.array([[-30,  36, 0],
-                  [-30, -36, 0]]),
-    c=np.array([30, -30]),
-    r=np.array([169.5, 81.0]),
+    a_W=np.array([[0.0,  36.0, 170.0],
+                  [0.0, -36.0,  82.0]]),
+    b_F=np.array([[-20.0,  36.0, 16.0],
+                  [-20.0, -36.0, 16.0]]),
+    c=np.array([30.0, -30.0]),
+    r=np.array([154.0, 66.0]),
     psi=np.array([deg2rad(90), deg2rad(-90)]),
 )
 
