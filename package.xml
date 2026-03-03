@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>joystick_rsu</name>
+  <version>0.1.0</version>
+  <description>
+    RViz visualization package for an RSU ankle mockup (2DOF ankle + dummy crank points).
+    Publishes cylinder markers between TF points to visualize linkage without closed-loop URDF.
+  </description>
+
+  <maintainer email="lwj@gmail.com">lwj</maintainer>
+  <license>MIT</license>
+
+  <!-- Build system -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- C++ node dependencies -->
+  <depend>rclcpp</depend>
+  <depend>geometry_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>python3-evdev</exec_depend>
+
+
+  <!-- Runtime tools for display -->
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+
+  <!-- (Optional but common) launch + xacro support -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <!-- URDF를 xacro로 바꿀 가능성이 있으면 유지 -->
+  <exec_depend>xacro</exec_depend>
+
+  <!-- Lint / test (optional) -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
