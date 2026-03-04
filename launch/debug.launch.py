@@ -32,7 +32,7 @@ def deg2rad(d):
 def generate_launch_description():
     pkg = FindPackageShare("joystick_rsu")
 
-    urdf_path = PathJoinSubstitution([pkg, "robot_model", "rsu_for_prototype.urdf"])
+    urdf_path = PathJoinSubstitution([pkg, "robot_model", "prototype_version", "rsu_for_prototype.urdf"])
     rviz_path = PathJoinSubstitution([pkg, "config", "rsu_2dof.rviz"])
     param_file = PathJoinSubstitution([pkg, "config", "rsu_solver.yaml"])
 
