@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from enum import Enum
 import os, sys
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -11,12 +12,16 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Vector3Stamped
 from sensor_msgs.msg import JointState
+from roa_interfaces.msg import RsuTarget, RsuSolution
 
 from tf2_ros import Buffer, TransformListener
 
 # RSU solver python binding
 from util.rsu_solver import RSUParams, RSUSolver
 
+class CONTROL_MODE(Enum):
+    RT_CONTROL = 1
+    DEBUG = 2
 
 def deg2rad(d):
     return d * math.pi / 180.0
@@ -66,6 +71,9 @@ class RSUSolverNode(Node):
     def __init__(self):
         super().__init__("rsu_solver_node")
 
+        rt = bool(self.declare_parameter("REALTIME_CONTROL_MODE", False).value)
+        self._control_mode = CONTROL_MODE.RT_CONTROL if rt else CONTROL_MODE.DEBUG
+
         # ===== joints (URDF names) =====
         self.joint_ankle_pitch = str(self.declare_parameter("joint_ankle_pitch", "ankle_pitch").value)
         self.joint_ankle_roll  = str(self.declare_parameter("joint_ankle_roll",  "ankle_roll").value)
@@ -74,7 +82,6 @@ class RSUSolverNode(Node):
 
         # infeasible 처리: infeasible이면 alpha 유지 or (사용자 정책대로)
         self.hold_alpha_on_infeasible = bool(self.declare_parameter("hold_alpha_on_infeasible", True).value)
-
         # ===== RSU Params =====
         a_W_flat = self.declare_parameter(
             "a_W_mm_flat",
@@ -121,11 +128,22 @@ class RSUSolverNode(Node):
         r   = np.array(r_list, dtype=np.float64).reshape(2,)
         psi = np.array(psi_list, dtype=np.float64).reshape(2,)
 
+        self._last_seq = None  # uint32 monotonic check
+
         p = RSUParams(a_W=a_W, b_F=b_F, c=c, r=r, psi=psi)
         self.solver = RSUSolver(p)
 
         # solver continuity용 prev alpha
-        self.prev_alpha_solver = np.array([0.0, 0.0], dtype=np.float64)
+        self.prev_alpha_1D = np.array([0.0, 0.0], dtype=np.float64)
+
+        """
+
+        [L_alpha1, L_alpha2],   # left foot
+        [R_alpha1, R_alpha2]    # right foot
+
+        """
+
+        self.prev_alpha_2D = np.zeros((2, 2), dtype=np.float64)
 
         # ===== state =====
         self.roll = 0.0
@@ -168,25 +186,32 @@ class RSUSolverNode(Node):
         self._tf_check_ok = False
         self._tf_check_diag = "not computed yet"
 
-        # TF check timer
-        # self.tf_check_rate_hz = float(self.declare_parameter("tf_check_rate_hz", 50.0).value)
-        # self.tf_log_rate_hz = float(self.declare_parameter("tf_log_rate_hz", 1.0).value)
-        # self._last_tf_log_t = 0.0
-
-        # period = 1.0 / max(1.0, self.tf_check_rate_hz)
-        # self.tf_check_timer = self.create_timer(period, self._update_tf_checks)
-
         # ===== ROS pub/sub =====
         self._last_stamp = None
+        # TF2용 joint state pubsliher
         self.pub_joint_state = self.create_publisher(
             JointState, "/joint_states", 10
         )
-        self.pub_solver_respond = self.create_publisher(
-            Vector3Stamped, "/solver_answer", 10
-        )
-        self.sub_solver_request = self.create_subscription(
-            Vector3Stamped, "/request_to_solver", self._on_rpy, 10
-        )
+        if self._control_mode == CONTROL_MODE.DEBUG:
+            # 디버그 모드용 조이패드에서 읽어온 누적 커맨드 적분값 입력 (*왼발만 해당)
+            self.pub_solver_respond = self.create_publisher(
+                Vector3Stamped, "/solver_answer", 10
+            )
+        
+            # 디버그 모드용 조이패드에서 읽어온 누적 커맨드 적분값 입력 (*왼발만 해당)
+            self.sub_solver_request = self.create_subscription(
+                Vector3Stamped, "/request_to_solver", self._on_rpy, 10
+            )
+        elif self._control_mode == CONTROL_MODE.RT_CONTROL:
+            # 실시간 제어에서 활용할 좌우 발에서 계산한 해 (* 양발)
+            self.pub_both_foot_solution = self.create_publisher(
+                RsuSolution, "/rsu/solution" ,10
+            )
+
+            # 실시간 제어용 > 제어기에서 받아온 목표 위치값 좌우 발 모두 해당함 (* 양발)
+            self.sub_both_foot_request = self.create_subscription(
+                RsuTarget, "/rsu/target" , self._on_both_foot_request ,10
+            )
 
         self.get_logger().info(
             "Started. Subscribing /request_to_solver, publishing /joint_states.\n"
@@ -195,6 +220,14 @@ class RSUSolverNode(Node):
             f"Targets: L1={self.target_len_1_m*1000:.1f}mm, L2={self.target_len_2_m*1000:.1f}mm, "
             f"tol={self.len_tol_m*1000:.1f}mm, ang=[{self.ang_min_deg:.1f},{self.ang_max_deg:.1f}]deg (ALL 4)"
         )
+
+    @property
+    def control_mode(self) -> CONTROL_MODE:
+        return self._control_mode
+
+    @control_mode.setter
+    def control_mode(self, _):
+        raise AttributeError("control_mode is read-only (set at init).")
 
     def publish_joint_states(self):
         msg = JointState()
@@ -343,26 +376,98 @@ class RSUSolverNode(Node):
         else:
             return True
     # ---------- main callback ----------
+
+    def _accept_target_order(self, seq: int, stamp) -> bool:
+        # 1) seq 우선
+        if seq != 0:
+            if self._last_seq is None:
+                self._last_seq = int(seq)
+                return True
+            if int(seq) <= int(self._last_seq):
+                return False
+            self._last_seq = int(seq)
+            return True
+
+        # 2) seq가 0이면 stamp로
+        if self._last_stamp is None:
+            self._last_stamp = stamp
+            return True
+        if stamp_to_ns(stamp) <= stamp_to_ns(self._last_stamp):
+            return False
+        self._last_stamp = stamp
+        return True
+
+    def _on_both_foot_request(self, msg: RsuTarget):
+        # monotonic check
+        if not self._accept_target_order(msg.seq, msg.header.stamp):
+            self.get_logger().warn("Received /rsu/target with non-increasing seq/stamp. Ignoring.")
+            return
+
+        # --- read inputs ---
+        l_roll  = float(msg.left_roll)
+        l_pitch = float(msg.left_pitch)
+        r_roll  = float(msg.right_roll) * -1.0
+        r_pitch = float(msg.right_pitch) * -1.0
+
+        # --- solve left/right with continuity ---
+        l_prev = self.prev_alpha_2D[0, :].copy()
+        r_prev = self.prev_alpha_2D[1, :].copy()
+
+        l_res = self.solver.solve(l_roll, l_pitch, l_prev)
+        r_res = self.solver.solve(r_roll, r_pitch, r_prev)
+
+        left_ok  = bool(l_res.feasible)
+        right_ok = bool(r_res.feasible)
+
+        # --- update or hold ---
+        if left_ok:
+            self.prev_alpha_2D[0, :] = np.array(l_res.alpha, dtype=np.float64).reshape(2,)
+        else:
+            if not self.hold_alpha_on_infeasible:
+                self.prev_alpha_2D[0, :] = 0.0
+
+        if right_ok:
+            self.prev_alpha_2D[1, :] = np.array(r_res.alpha, dtype=np.float64).reshape(2,)
+        else:
+            if not self.hold_alpha_on_infeasible:
+                self.prev_alpha_2D[1, :] = 0.0
+
+        # --- publish solution ---
+        out = RsuSolution()
+        out.header.stamp = msg.header.stamp
+        out.seq = msg.seq
+
+        out.left_actuator_1  = float(self.prev_alpha_2D[0, 0])
+        out.left_actuator_2  = float(self.prev_alpha_2D[0, 1])
+        out.right_actuator_1 = float(self.prev_alpha_2D[1, 0]) * -1.0
+        out.right_actuator_2 = float(self.prev_alpha_2D[1, 1]) * -1.0
+
+        # feasible 의미: "이번 요청에 대해 좌/우 모두 유효해"
+        out.feasible = bool(left_ok and right_ok)
+
+        self.pub_both_foot_solution.publish(out)
+
     def _on_rpy(self, msg: Vector3Stamped):
         # NOTE
         # 상위 컨트롤러에서 cmd msg 발생시 마다 timestamp 작성 -> solver에서는 request msg의 타임스탬프와 출력값을 연동하여 관리
-        if self._last_stamp is None:
+        if self._control_mode == CONTROL_MODE.DEBUG:
+            if self._last_stamp is None:
+                self._last_stamp = msg.header.stamp
+            elif stamp_to_ns(msg.header.stamp) <= stamp_to_ns(self._last_stamp):
+                self.get_logger().warn(
+                    "Received /request_to_solver with timestamp older than or equal to last processed command. Ignoring."
+                )
+                return
             self._last_stamp = msg.header.stamp
-        elif stamp_to_ns(msg.header.stamp) <= stamp_to_ns(self._last_stamp):
-            self.get_logger().warn(
-                "Received /request_to_solver with timestamp older than or equal to last processed command. Ignoring."
-            )
-            return
-        self._last_stamp = msg.header.stamp
 
         # RSU solve -> alpha
-        res = self.solver.solve(float(msg.vector.x), float(msg.vector.y), self.prev_alpha_solver)
+        res = self.solver.solve(float(msg.vector.x), float(msg.vector.y), self.prev_alpha_1D)
 
         if bool(res.feasible):
             a_solver = np.array(res.alpha, dtype=np.float64).reshape(2,)
             self.alpha1 = float(a_solver[0])
             self.alpha2 = float(a_solver[1])
-            self.prev_alpha_solver[:] = a_solver
+            self.prev_alpha_1D[:] = a_solver
             self.roll = float(msg.vector.x)
             self.pitch = float(msg.vector.y)
         else:
@@ -385,7 +490,8 @@ class RSUSolverNode(Node):
             except Exception as e:
                 self._tf_check_ok = False
                 self.get_logger().error(f"TF hardware safety check FAILED: {e}")
-        self.publish_solver_respond(res.feasible and self._tf_check_ok)
+        if self._control_mode == CONTROL_MODE.DEBUG:
+            self.publish_solver_respond(res.feasible and self._tf_check_ok)
 
 
 def main():

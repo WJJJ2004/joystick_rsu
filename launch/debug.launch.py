@@ -34,26 +34,9 @@ def generate_launch_description():
 
     urdf_path = PathJoinSubstitution([pkg, "robot_model", "rsu_for_prototype.urdf"])
     rviz_path = PathJoinSubstitution([pkg, "config", "rsu_2dof.rviz"])
-
-    world_frame = LaunchConfiguration("world_frame")
-
-    gate_publish_by_tf_check = LaunchConfiguration("gate_publish_by_tf_check")
-    tf_check_rate_hz = LaunchConfiguration("tf_check_rate_hz")
-    tf_timeout_sec = LaunchConfiguration("tf_timeout_sec")
-    len_tol_m = LaunchConfiguration("len_tol_m")
-    ang_min_deg = LaunchConfiguration("ang_min_deg")
-    ang_max_deg = LaunchConfiguration("ang_max_deg")
+    param_file = PathJoinSubstitution([pkg, "config", "rsu_solver.yaml"])
 
     return LaunchDescription([
-        DeclareLaunchArgument("use_rviz", default_value="true"),
-        DeclareLaunchArgument("world_frame", default_value="base_link"),
-
-        DeclareLaunchArgument("gate_publish_by_tf_check", default_value="true"),
-        DeclareLaunchArgument("tf_check_rate_hz", default_value="30.0"),
-        DeclareLaunchArgument("tf_timeout_sec", default_value="0.05"),
-        DeclareLaunchArgument("len_tol_m", default_value="0.002"),
-        DeclareLaunchArgument("ang_min_deg", default_value="65.0"),
-        DeclareLaunchArgument("ang_max_deg", default_value="115.0"),
 
         # Robot description
         Node(
@@ -64,6 +47,7 @@ def generate_launch_description():
             parameters=[{
                 "robot_description": Command(["cat ", urdf_path]),
             }],
+            arguments=["--ros-args", "--log-level", "info"],
         ),
 
         Node(
@@ -82,6 +66,7 @@ def generate_launch_description():
                 "pitch_max_limit_rad": deg2rad(20.0),
                 "pitch_min_limit_rad": deg2rad(-30.0),
             }],
+            arguments=["--ros-args", "--log-level", "info"],
         ),
 
         Node(
@@ -89,45 +74,11 @@ def generate_launch_description():
             executable="rsu_solver_node.py",
             name="rsu_solver_node",
             output="screen",
-            parameters=[{
-                # ===== RSU IK params =====
-                "a_W_mm_flat": [0.0,  36.0, 170.0,  0.0, -36.0, 82.0],
-                "b_F_mm_flat": [-20.0, 36.0, 16.0,  -20.0, -36.0, 16.0],
-                "c_mm": [30.0, -30.0],
-                "r_mm": [154.0, 66.0],
-                "psi_rad": [deg2rad(90.0), deg2rad(-90.0)],
-
-                # ===== joints =====
-                "joint_ankle_pitch": "ankle_pitch",
-                "joint_ankle_roll": "ankle_roll",
-                "joint_upper_crank": "upper_crank",
-                "joint_lower_crank": "lower_crank",
-
-                "hold_alpha_on_infeasible": True,
-
-                # ===== TF-based crank sanity check params =====
-                "world_frame": world_frame,
-                "tf_timeout_sec": tf_timeout_sec,
-                "tf_check_rate_hz": tf_check_rate_hz,
-                "gate_publish_by_tf_check": gate_publish_by_tf_check,
-
-                # frames (keep identical with plotter)
-                "c1_frame": "point_c1_1",
-                "c2_frame": "point_c2_1",
-                "u1_frame": "point_u1_1",
-                "u2_frame": "point_u2_1",
-
-                # # targets + tolerances (meters)
-                # "target_len_1_m": 0.1695,
-                # "target_len_2_m": 0.0810,
-                "len_tol_m": len_tol_m,
-
-                # angle range (deg) - ALL 4 enforced inside node
-                "ang_min_deg": ang_min_deg,
-                "ang_max_deg": ang_max_deg,
-
-                "tf_log_rate_hz": 1.0,
-            }],
+            parameters=[
+                param_file,
+                {"REALTIME_CONTROL_MODE": False},
+            ],
+            arguments=["--ros-args", "--log-level", "info"],
         ),
 
         # Marker plotter (unchanged)
@@ -137,7 +88,7 @@ def generate_launch_description():
             name="rsu_link_plotter",
             output="screen",
             parameters=[{
-                "world_frame": world_frame,
+                "world_frame": "base_link",
                 "publish_rate_hz": 60.0,
                 "radius": 0.004,
                 "c1_frame": "point_c1_1",
@@ -152,6 +103,7 @@ def generate_launch_description():
                 "link1_r": 1.0, "link1_g": 0.1, "link1_b": 0.1, "link1_a": 0.9,
                 "link2_r": 0.1, "link2_g": 0.4, "link2_b": 1.0, "link2_a": 0.9,
             }],
+            arguments=["--ros-args", "--log-level", "info"],
         ),
 
         # RViz
@@ -161,7 +113,7 @@ def generate_launch_description():
             name="rviz2",
             output="screen",
             arguments=["-d", rviz_path],
-            condition=None,  # keep your original behavior
+            condition=None,
         ),
     ])
 
