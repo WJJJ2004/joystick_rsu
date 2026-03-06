@@ -1,5 +1,9 @@
 # RSU Solver Node 
 
+
+[스크린캐스트 02-27-2026 10:46:36 AM.webm](https://github.com/user-attachments/assets/6e46eb1b-2ca9-4884-81df-166c7f2dd84f)
+
+
 상위 제어기에서 **양발 발목(RSU 2DOF)**에 대한 **Roll/Pitch 목표값을 입력으로 받아**, 각 발의 **Actuator 2개(총 4개)** 해를 계산해주는 **IK 컴포넌트 노드**입니다.
 
 ---
