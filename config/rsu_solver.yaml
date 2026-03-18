@@ -1,0 +1,51 @@
+rsu_solver_node:
+  ros__parameters:
+    # --- mode: launch에서만 override 하는 걸 추천 ---
+    REALTIME_CONTROL_MODE: false
+
+    # ===== RSU IK params =====
+    a_W_mm_flat: [0.0, 36.0, 170.0, 0.0, -36.0, 82.0]
+    b_F_mm_flat: [-20.0, 36.0, 16.0, -20.0, -36.0, 16.0]
+    c_mm: [30.0, -30.0]
+    r_mm: [154.0, 66.0]
+    psi_rad: [1.5707963267948966, -1.5707963267948966]  # +/- 90deg
+
+    # ===== RSU State Estimator Params =====
+    jac_lambda: 1e-6
+    jac_h: 5e-5
+    beta_jac: 1.0
+    vel_lpf_tau: 0.0
+    motor_vel_lpf_tau: 0.0
+
+    # ===== Actuator ID Mapping (ID to RSU solver) =====
+    left_ac1_id: 18
+    left_ac2_id: 20
+    right_ac1_id: 19
+    right_ac2_id: 21
+
+    # ===== joints =====
+    joint_ankle_pitch: "ankle_pitch"
+    joint_ankle_roll: "ankle_roll"
+    joint_upper_crank: "upper_crank"
+    joint_lower_crank: "lower_crank"
+
+    hold_alpha_on_infeasible: true
+
+    # ===== TF-based crank sanity check params =====
+    world_frame: "base_link"
+    tf_timeout_sec: 0.05
+    tf_check_rate_hz: 30.0
+    gate_publish_by_tf_check: true
+
+    # frames
+    c1_frame: "point_c1_1"
+    c2_frame: "point_c2_1"
+    u1_frame: "point_u1_1"
+    u2_frame: "point_u2_1"
+
+    # tolerances / limits
+    len_tol_m: 0.002
+    ang_min_deg: 65.0
+    ang_max_deg: 115.0
+
+    tf_log_rate_hz: 1.0

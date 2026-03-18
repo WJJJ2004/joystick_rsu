@@ -7,7 +7,7 @@
     Publishes cylinder markers between TF points to visualize linkage without closed-loop URDF.
   </description>
 
-  <maintainer email="lwj@gmail.com">lwj</maintainer>
+  <maintainer email="dldnjswns7412@gmail.com">lwj</maintainer>
   <license>MIT</license>
 
   <!-- Build system -->

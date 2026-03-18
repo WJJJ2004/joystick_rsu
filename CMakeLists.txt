@@ -38,6 +38,9 @@ install(DIRECTORY scripts/util
 install(FILES
   scripts/util/gamepad_reader.py
   scripts/util/rsu_solver.py
+  scripts/gamepad_rpy_node.py
+  scripts/rsu_solver_node.py
+
   DESTINATION lib/${PROJECT_NAME}
 )
 

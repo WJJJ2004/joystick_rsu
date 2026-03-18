@@ -10,7 +10,6 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Vector3Stamped
 from sensor_msgs.msg import JointState
-
 from util.gamepad_reader import Gamepad
 
 def clamp(x, lo, hi):
