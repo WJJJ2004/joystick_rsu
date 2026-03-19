@@ -466,6 +466,25 @@ class RSUSolverNode(Node):
                 f"R(res={right_state.residual_norm:.3e}, cond={right_state.condJ:.3f}, sigma_min={right_state.sigma_min:.3e})"
             )
 
+    def _estimate_one_foot(self, estimator, motor_pos, motor_vel, dt, mirror=False):
+        motor_pos = np.array(motor_pos, dtype=np.float64)
+        motor_vel = np.array(motor_vel, dtype=np.float64)
+
+        if mirror:
+            motor_pos = -motor_pos
+            motor_vel = -motor_vel
+
+        state = estimator.update(motor_pos, motor_vel, dt)
+
+        q = np.array(state.q_rel, dtype=np.float64)
+        qd = np.array(state.qd_rel, dtype=np.float64)
+
+        if mirror:
+            q = -q
+            qd = -qd
+
+        return state, q, qd
+
     def publish_solver_respond(self, feasible: bool):
         msg = Vector3Stamped()
         msg.header.stamp = self._last_stamp
