@@ -354,15 +354,15 @@ class RSUSolverNode(Node):
                 self.motor_state["left_ac1"]["pos"] = float(st.position)
                 self.motor_state["left_ac1"]["vel"] = float(st.velocity)
 
-            elif motor_id == self.motor_state["left_ac2"]["id"]:
+            if motor_id == self.motor_state["left_ac2"]["id"]:
                 self.motor_state["left_ac2"]["pos"] = float(st.position)
                 self.motor_state["left_ac2"]["vel"] = float(st.velocity)
 
-            elif motor_id == self.motor_state["right_ac1"]["id"]:
+            if motor_id == self.motor_state["right_ac1"]["id"]:
                 self.motor_state["right_ac1"]["pos"] = float(st.position)
                 self.motor_state["right_ac1"]["vel"] = float(st.velocity)
 
-            elif motor_id == self.motor_state["right_ac2"]["id"]:
+            if motor_id == self.motor_state["right_ac2"]["id"]:
                 self.motor_state["right_ac2"]["pos"] = float(st.position)
                 self.motor_state["right_ac2"]["vel"] = float(st.velocity)
 
