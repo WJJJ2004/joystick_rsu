@@ -346,31 +346,43 @@ class RSUSolverNode(Node):
             )
 
     def _on_motor_state(self, msg: MotorStateArray):
-        # 1) 최신 모터 상태 캐시 갱신
-        for st in msg.states:
-            motor_id = int(st.motor_id)
-
-            if motor_id == self.motor_state["left_ac1"]["id"]:
-                self.motor_state["left_ac1"]["pos"] = float(st.position)
-                self.motor_state["left_ac1"]["vel"] = float(st.velocity)
-
-            if motor_id == self.motor_state["left_ac2"]["id"]:
-                self.motor_state["left_ac2"]["pos"] = float(st.position)
-                self.motor_state["left_ac2"]["vel"] = float(st.velocity)
-
-            if motor_id == self.motor_state["right_ac1"]["id"]:
-                self.motor_state["right_ac1"]["pos"] = float(st.position)
-                self.motor_state["right_ac1"]["vel"] = float(st.velocity)
-
-            if motor_id == self.motor_state["right_ac2"]["id"]:
-                self.motor_state["right_ac2"]["pos"] = float(st.position)
-                self.motor_state["right_ac2"]["vel"] = float(st.velocity)
-
-        # 2) 4개 모터 상태가 모두 준비될 때까지 대기
-        required_keys = ["left_ac1", "left_ac2", "right_ac1", "right_ac2"]
-        for key in required_keys:
-            if self.motor_state[key]["pos"] is None or self.motor_state[key]["vel"] is None:
-                return
+        # 1) 메시지에 필요한 모터 ID들이 모두 존재하는지 확인
+        required_ids = {
+            self.motor_state["left_ac1"]["id"],
+            self.motor_state["left_ac2"]["id"],
+            self.motor_state["right_ac1"]["id"],
+            self.motor_state["right_ac2"]["id"],
+        }
+        
+        msg_ids = {int(st.motor_id) for st in msg.states}
+        missing_ids = required_ids - msg_ids
+        
+        if missing_ids:
+            self.get_logger().error(
+            f"Missing motor IDs in /hardware_interface/state: {missing_ids}. "
+            f"Expected: {required_ids}, Got: {msg_ids}"
+            )
+            return
+        
+        # 2) ID -> index 매핑 생성
+        id_to_state = {int(st.motor_id): st for st in msg.states}
+        
+        # 3) 병렬 로드: 4개 모터 상태를 한번에 읽기
+        try:
+            self.motor_state["left_ac1"]["pos"] = float(id_to_state[self.motor_state["left_ac1"]["id"]].position)
+            self.motor_state["left_ac1"]["vel"] = float(id_to_state[self.motor_state["left_ac1"]["id"]].velocity)
+            
+            self.motor_state["left_ac2"]["pos"] = float(id_to_state[self.motor_state["left_ac2"]["id"]].position)
+            self.motor_state["left_ac2"]["vel"] = float(id_to_state[self.motor_state["left_ac2"]["id"]].velocity)
+            
+            self.motor_state["right_ac1"]["pos"] = float(id_to_state[self.motor_state["right_ac1"]["id"]].position)
+            self.motor_state["right_ac1"]["vel"] = float(id_to_state[self.motor_state["right_ac1"]["id"]].velocity)
+            
+            self.motor_state["right_ac2"]["pos"] = float(id_to_state[self.motor_state["right_ac2"]["id"]].position)
+            self.motor_state["right_ac2"]["vel"] = float(id_to_state[self.motor_state["right_ac2"]["id"]].velocity)
+        except (KeyError, IndexError, AttributeError) as e:
+            self.get_logger().error(f"Failed to parse motor state: {e}")
+            return
 
         # 3) dt 계산
         stamp_ns = stamp_to_ns(msg.header.stamp)
