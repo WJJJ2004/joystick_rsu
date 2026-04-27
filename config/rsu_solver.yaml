@@ -17,6 +17,19 @@ rsu_solver_node:
     vel_lpf_tau: 0.0
     motor_vel_lpf_tau: 0.0
 
+    # ==== RT initial pos seed ====
+    # left_q_seed: [0.0, 0.0]
+    # right_q_seed: [0.0, 0.0]
+
+    # left_alpha_seed: [0.0, 0.0]
+    # right_alpha_seed: [0.0, 0.0]
+
+    #    # ==== RT initial pos seed ====
+    left_q_seed: [0.0, -0.5672320]
+    right_q_seed: [0.0, -0.5672320]
+
+    left_alpha_seed: [-0.458105, 0.458105]
+    right_alpha_seed: [-0.458105, 0.458105]
     # ===== Actuator ID Mapping (ID to RSU solver) =====
     left_ac1_id: 18
     left_ac2_id: 20

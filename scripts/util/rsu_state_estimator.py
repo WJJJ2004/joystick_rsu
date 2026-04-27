@@ -133,11 +133,42 @@ class RSUStateEstimator:
     # -------------------------------------------------------------------------
     # Public API
     # -------------------------------------------------------------------------
-    def reset(self, q_init: Optional[np.ndarray] = None):
-        self.initialized_ = False
-        self.x_prev_ = self.cfg.q_init.copy() if q_init is None else np.asarray(q_init, dtype=float).reshape(2,)
-        self.xd_prev_ = np.zeros(2, dtype=float)
-        self.alpha_prev_seed_ = np.zeros(2, dtype=float)
+    # def reset(self, q_init: Optional[np.ndarray] = None):
+    #     self.initialized_ = False
+    #     self.x_prev_ = self.cfg.q_init.copy() if q_init is None else np.asarray(q_init, dtype=float).reshape(2,)
+    #     self.xd_prev_ = np.zeros(2, dtype=float)
+    #     self.alpha_prev_seed_ = np.zeros(2, dtype=float)
+    #     self.motor_vel_prev_filt_ = np.zeros(2, dtype=float)
+    #     self.last_valid_ = False
+    #     self.last_branch_ = np.full(2, -1, dtype=int)
+
+    def reset(
+        self,
+        q_init: Optional[np.ndarray] = None,
+        alpha_seed: Optional[np.ndarray] = None,
+        qd_init: Optional[np.ndarray] = None,
+        initialized: bool = False,
+    ):
+        self.initialized_ = initialized
+
+        self.x_prev_ = (
+            self.cfg.q_init.copy()
+            if q_init is None
+            else np.asarray(q_init, dtype=float).reshape(2,)
+        )
+
+        self.xd_prev_ = (
+            np.zeros(2, dtype=float)
+            if qd_init is None
+            else np.asarray(qd_init, dtype=float).reshape(2,)
+        )
+
+        self.alpha_prev_seed_ = (
+            np.zeros(2, dtype=float)
+            if alpha_seed is None
+            else np.asarray(alpha_seed, dtype=float).reshape(2,)
+        )
+
         self.motor_vel_prev_filt_ = np.zeros(2, dtype=float)
         self.last_valid_ = False
         self.last_branch_ = np.full(2, -1, dtype=int)

@@ -126,6 +126,26 @@ class RSUSolverNode(Node):
         beta_jac = self.declare_parameter("beta_jac", 1.0).value
         vel_lpf_tau = self.declare_parameter("vel_lpf_tau", 0.0).value
         motor_vel_lpf_tau = self.declare_parameter("motor_vel_lpf_tau",0.0).value
+        
+        self.left_q_seed = np.array(
+            self.declare_parameter("left_q_seed", [0.0, 0.0]).value,
+            dtype=np.float64
+        )
+
+        self.right_q_seed = np.array(
+            self.declare_parameter("right_q_seed", [0.0, 0.0]).value,
+            dtype=np.float64
+        )
+
+        self.left_alpha_seed = np.array(
+            self.declare_parameter("left_alpha_seed", [0.0, 0.0]).value,
+            dtype=np.float64
+        )
+
+        self.right_alpha_seed = np.array(
+            self.declare_parameter("right_alpha_seed", [0.0, 0.0]).value,
+            dtype=np.float64
+        )
 
         self.get_logger().info(
             f"RSU Params:\n"
@@ -201,6 +221,19 @@ class RSUSolverNode(Node):
         self.right_estimator = RSUStateEstimator(
             solver=self.solver,
             cfg=est_cfg,
+        )
+        
+        # RT 제어 모드에서는 시드값으로 초기화
+        self.left_estimator.reset(
+            q_init=self.left_q_seed,
+            alpha_seed=self.left_alpha_seed,
+            initialized=True,
+        )
+
+        self.right_estimator.reset(
+            q_init=self.right_q_seed,
+            alpha_seed=self.right_alpha_seed,
+            initialized=True,
         )
 
         self._last_motor_state_stamp_ns = None
@@ -461,6 +494,32 @@ class RSUSolverNode(Node):
         )
 
         self.pub_rsu_state.publish(out)
+
+        # ===== 디버깅: 상세 로깅 (일시적) =====
+        # ENABLE_DEBUG_LOG = True  # 디버깅 활성화 플래그
+        # if ENABLE_DEBUG_LOG:
+        #     self.get_logger().warn(
+        #         f"[DEBUG] Motor Input:\n"
+        #         f"  L_pos={left_motor_pos.tolist()}, L_vel={left_motor_vel.tolist()}\n"
+        #         f"  R_pos={right_motor_pos.tolist()}, R_vel={right_motor_vel.tolist()}\n"
+        #         f"  dt={dt:.6f}s"
+        #     )
+        #     self.get_logger().warn(
+        #         f"[DEBUG] Left Estimator Output:\n"
+        #         f"  q={left_q.tolist()}, qd={left_qd.tolist()}\n"
+        #         f"  feasible={left_state.feasible}, valid={left_state.valid}, degraded={left_state.degraded}\n"
+        #         f"  residual={left_state.residual_norm:.3e}, condJ={left_state.condJ:.3f}, sigma_min={left_state.sigma_min:.3e}\n"
+        #         f"  q_rel={np.array(left_state.q_rel).tolist()}, qd_rel={np.array(left_state.qd_rel).tolist()}\n"
+        #         f"  seed: q={self.left_q_seed.tolist()}, alpha={self.left_alpha_seed.tolist()}"
+        #     )
+        #     self.get_logger().warn(
+        #         f"[DEBUG] Right Estimator Output:\n"
+        #         f"  q={right_q.tolist()}, qd={right_qd.tolist()}\n"
+        #         f"  feasible={right_state.feasible}, valid={right_state.valid}, degraded={right_state.degraded}\n"
+        #         f"  residual={right_state.residual_norm:.3e}, condJ={right_state.condJ:.3f}, sigma_min={right_state.sigma_min:.3e}\n"
+        #         f"  q_rel={np.array(right_state.q_rel).tolist()}, qd_rel={np.array(right_state.qd_rel).tolist()}\n"
+        #         f"  seed: q={self.right_q_seed.tolist()}, alpha={self.right_alpha_seed.tolist()}"
+        #     )
 
         # 7) degraded / invalid 상태 로깅
         if (not left_state.valid) or (not right_state.valid):
