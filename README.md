@@ -1,8 +1,11 @@
 # joystick_rsu
 
+[스크린캐스트 02-27-2026 10:46:36 AM.webm](https://github.com/user-attachments/assets/1be4885f-e8ae-417a-a76b-f7b9a593c6d2)
+
 This is a ROS 2 package for controlling and visualizing a 2-DOF RSU (Rotary Stewart Unit) ankle mechanism. It takes roll and pitch targets from a joystick and calculates the target angles of two actuators using inverse kinematics.
 
 This repository contains preliminary research conducted for the follow-up project, [roa_controller](https://github.com/WJJJ2004/roa_controller).
+
 
 ## Features
 
